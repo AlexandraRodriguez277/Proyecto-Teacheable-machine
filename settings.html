@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Clasificador de Campeones - Roles en Línea</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.20.0/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8/dist/teachablemachine-image.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #074b87; 
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden; /* Para que las imágenes de esquina no causen barras de desplazamiento */
+        }
+
+        .container {
+            background: white;
+            padding: 25px 35px;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+            text-align: center;
+            max-width: 450px;
+            width: 100%;
+            z-index: 10; 
+        }
+
+        h1 { font-size: 24px; margin-bottom: 5px; }
+        p { margin-bottom: 20px; color: #555; }
+
+        /* Estilos del Input de Archivo */
+        #imageUpload {
+            margin-bottom: 20px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            width: calc(100% - 20px);
+        }
+
+        /* Contenedor de la Imagen Subida */
+        #imageContainer {
+            margin: 15px auto;
+            border: 6px solid #555;
+            border-radius: 20px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.25);
+            display: inline-block;
+            padding: 5px;
+            background-color: #fff;
+            max-width: 330px; 
+            max-height: 330px;
+            overflow: hidden;
+        }
+
+        #uploadedImage {
+            max-width: 320px;
+            max-height: 320px;
+            display: block;
+            border-radius: 15px;
+        }
+
+        #label-container {
+            margin-top: 20px;
+            font-weight: bold;
+            font-size: 22px;
+            padding: 15px;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            transition: all 0.3s;
+            border: 3px solid #333;
+            background-color: #f0f8ff; 
+        }
+
+        /* ESTILOS PARA LAS IMÁGENES DE ESQUINA */
+        .corner-image {
+            position: absolute;
+            width: 150px; 
+            height: auto;
+            opacity: 0.6; 
+            z-index: 1;
+        }
+
+        #top-left {
+            top: 20px;
+            left: 20px;
+            transform: rotate(-15deg);
+        }
+
+        #bottom-right {
+            bottom: 20px;
+            right: 20px;
+            transform: rotate(15deg);
+        }
+    </style>
+</head>
+<body>
+    
+    <img id="top-left" class="corner-image" src="https://cdn.wallpapersafari.com/14/70/MBWbzT.png" alt="Campeón Esquina Superior Izquierda">
+    <img id="bottom-right" class="corner-image" src="https://upload.wikimedia.org/wikipedia/commons/d/d8/League_of_Legends_2019_vector.svg" alt="Campeón Esquina Inferior Derecha">
+
+    <div class="container">
+        <h1>Clasificador de Campeones</h1>
+        <p>Sube una imagen de un campeón para clasificar su Rol</p>
+        
+        <input type="file" id="imageUpload" accept="image/*">
+        
+        <div id="imageContainer"></div>
+        
+        <div id="label-container">Esperando subida de imagen...</div>
+    </div>
+
+    <script>
+        // La URL del modelo se mantiene
+        const URL = "https://teachablemachine.withgoogle.com/models/eHgGYtTwnj/";
+
+        let model, imageInput, labelContainer;
+
+        async function init() {
+            // Cargar el modelo
+            const modelURL = URL + "model.json";
+            const metadataURL = URL + "metadata.json";
+            model = await tmImage.load(modelURL, metadataURL);
+            
+            labelContainer = document.getElementById("label-container");
+            imageInput = document.getElementById("imageUpload");
+            
+            // Asignar el evento 'change' al input de archivo
+            imageInput.addEventListener("change", async (event) => {
+                const file = event.target.files[0];
+                if (file) {
+                    // 1. Espera a que la imagen se cargue completamente
+                    const imgElement = await previewImage(file); 
+                    // 2. Solo entonces, llama a predict
+                    if (imgElement) {
+                        await predict(imgElement);
+                    }
+                }
+            });
+            
+            labelContainer.innerHTML = "Modelo cargado. Sube una imagen.";
+        }
+        
+        // FUNCIÓN MODIFICADA: Usa Promise para esperar la carga del elemento <img>
+        function previewImage(file) {
+            return new Promise((resolve) => {
+                const reader = new FileReader();
+                
+                reader.onload = function(e) {
+                    let img = document.getElementById("uploadedImage");
+                    if (!img) {
+                        img = document.createElement("img");
+                        img.id = "uploadedImage";
+                        document.getElementById("imageContainer").innerHTML = "";
+                        document.getElementById("imageContainer").appendChild(img);
+                    }
+                    img.src = e.target.result; 
+
+                    // CLAVE: Resolver la promesa SÓLO cuando la imagen está lista
+                    img.onload = () => resolve(img);
+                    
+                    if (img.complete && img.naturalHeight !== 0) {
+                        resolve(img);
+                    }
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+
+        async function predict(imgElement) {
+            labelContainer.innerHTML = "Analizando...";
+            
+            if (!imgElement) {
+                labelContainer.innerHTML = "Error interno: El elemento de imagen no está disponible.";
+                return;
+            }
+
+            const prediction = await model.predict(imgElement);
+
+            let resultado = prediction.sort((a, b) => b.probability - a.probability)[0];
+
+            labelContainer.innerHTML =
+                resultado.className.toUpperCase() + " - " + (resultado.probability * 100).toFixed(2) + "%";
+
+            // Aplicar estilos
+            // Asegúrate de cambiar 'original' y 'falso' por los nombres de las clases de tu modelo (ej: 'TOP', 'MID', 'ADC')
+            if (resultado.className.toLowerCase() === "original") {
+                labelContainer.style.backgroundColor = "#4caf50";
+                labelContainer.style.color = "#fff";
+                labelContainer.style.border = "3px solid #388e3c";
+            } else if (resultado.className.toLowerCase() === "falso") {
+                labelContainer.style.backgroundColor = "#f44336";
+                labelContainer.style.color = "#fff";
+                labelContainer.style.border = "3px solid #b71c1c";
+            } else {
+                // Estilo por defecto 
+                labelContainer.style.backgroundColor = "#f0f8ff";
+                labelContainer.style.color = "#333";
+                labelContainer.style.border = "3px solid #333";
+            }
+        }
+
+        // Iniciar la aplicación automáticamente
+        init();
+    </script>
+</body>
+</html>
