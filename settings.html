@@ -15,7 +15,7 @@
             align-items: center;
             height: 100vh;
             margin: 0;
-            overflow: hidden; /* Para que las imágenes de esquina no causen barras de desplazamiento */
+            overflow: hidden; 
         }
 
         .container {
@@ -62,16 +62,23 @@
             border-radius: 15px;
         }
 
+        /* Contenedor de etiquetas para mostrar múltiples resultados */
         #label-container {
             margin-top: 20px;
             font-weight: bold;
-            font-size: 22px;
             padding: 15px;
             border-radius: 15px;
             box-shadow: 0 5px 15px rgba(0,0,0,0.2);
             transition: all 0.3s;
             border: 3px solid #333;
             background-color: #f0f8ff; 
+            text-align: left; /* Alineación para la lista de resultados */
+        }
+        
+        /* Estilos para cada resultado */
+        .prediction-result {
+            margin-bottom: 8px;
+            font-size: 18px;
         }
 
         /* ESTILOS PARA LAS IMÁGENES DE ESQUINA */
@@ -113,7 +120,6 @@
     </div>
 
     <script>
-        // La URL del modelo se mantiene
         const URL = "https://teachablemachine.withgoogle.com/models/eHgGYtTwnj/";
 
         let model, imageInput, labelContainer;
@@ -143,7 +149,7 @@
             labelContainer.innerHTML = "Modelo cargado. Sube una imagen.";
         }
         
-        // FUNCIÓN MODIFICADA: Usa Promise para esperar la carga del elemento <img>
+        // FUNCIÓN: Usa Promise para esperar la carga del elemento <img>
         function previewImage(file) {
             return new Promise((resolve) => {
                 const reader = new FileReader();
@@ -179,27 +185,38 @@
 
             const prediction = await model.predict(imgElement);
 
-            let resultado = prediction.sort((a, b) => b.probability - a.probability)[0];
+            // Ordenar las predicciones por probabilidad descendente
+            const sortedPrediction = prediction.sort((a, b) => b.probability - a.probability);
+            
+            // Tomar los dos resultados principales
+            const result1 = sortedPrediction[0];
+            const result2 = sortedPrediction[1]; // El segundo resultado
 
-            labelContainer.innerHTML =
-                resultado.className.toUpperCase() + " - " + (resultado.probability * 100).toFixed(2) + "%";
-
-            // Aplicar estilos
-            // Asegúrate de cambiar 'original' y 'falso' por los nombres de las clases de tu modelo (ej: 'TOP', 'MID', 'ADC')
-            if (resultado.className.toLowerCase() === "original") {
-                labelContainer.style.backgroundColor = "#4caf50";
-                labelContainer.style.color = "#fff";
-                labelContainer.style.border = "3px solid #388e3c";
-            } else if (resultado.className.toLowerCase() === "falso") {
-                labelContainer.style.backgroundColor = "#f44336";
-                labelContainer.style.color = "#fff";
-                labelContainer.style.border = "3px solid #b71c1c";
-            } else {
-                // Estilo por defecto 
-                labelContainer.style.backgroundColor = "#f0f8ff";
-                labelContainer.style.color = "#333";
-                labelContainer.style.border = "3px solid #333";
+            // Construir el HTML para mostrar los dos resultados
+            let resultHTML = "<ul>";
+            
+            // Primer resultado (el más probable)
+            if (result1) {
+                 resultHTML += `<li class="prediction-result" style="color: #007bff;">
+                    #1 = ${result1.className.toUpperCase()}**: ${(result1.probability * 100).toFixed(2)}%
+                </li>`;
             }
+            
+            // Segundo resultado
+            if (result2) {
+                 resultHTML += `<li class="prediction-result" style="color: #28a745;">
+                    #2 =  ${result2.className.toUpperCase()}: ${(result2.probability * 100).toFixed(2)}%
+                </li>`;
+            }
+
+            resultHTML += "</ul>";
+
+            labelContainer.innerHTML = resultHTML;
+
+            // (Opcional: puedes eliminar los estilos de fondo de color basados en 'original'/'falso' o adaptarlos)
+            labelContainer.style.backgroundColor = "#fff3cd"; // Estilo neutro para mostrar lista
+            labelContainer.style.color = "#333";
+            labelContainer.style.border = "3px solid #ffc107";
         }
 
         // Iniciar la aplicación automáticamente
